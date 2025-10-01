@@ -11,10 +11,13 @@
     :root{--bg:#f6f7fb;--card:#fff;--accent:#4f46e5;--muted:#6b7280}
     *{box-sizing:border-box}
     body{font-family:Inter, system-ui, Arial, sans-serif;margin:0;background:var(--bg);color:#0f172a}
-    .app{max-width:900px;margin:36px auto;padding:20px}
+    .app{max-width:900px;margin:36px auto;padding:20px;transition:all 0.3s ease}
+    .app.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;margin:0;padding:20px;z-index:9999;background:var(--bg);overflow-y:auto}
     header{display:flex;align-items:center;justify-content:space-between}
     h1{font-size:1.5rem;margin:0}
     .controls{display:flex;gap:8px;align-items:center}
+    .fullscreen-btn{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;touch-action:manipulation;min-height:44px;font-size:16px;transition:all 0.2s ease}
+    .fullscreen-btn:hover{background:#3730a3;transform:translateY(-1px)}
     button,select{background:var(--card);border:1px solid #e6e8f0;padding:8px 12px;border-radius:8px;cursor:pointer;touch-action:manipulation;min-height:44px;font-size:16px}
     .board{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:18px}
     .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);padding:18px;text-align:center;cursor:pointer;user-select:none;touch-action:manipulation;transition:transform 0.2s ease,box-shadow 0.2s ease}
@@ -30,12 +33,14 @@
     footer{margin-top:22px;color:var(--muted);font-size:0.9rem}
     @media(max-width:480px){
       .app{padding:12px;margin:16px auto}
+      .app.fullscreen{padding:16px}
       .board{grid-template-columns:repeat(4,1fr);gap:6px}
       .card{padding:12px}
       .letter{font-size:2.5rem}
       .big .letter{font-size:4rem}
       .controls{flex-wrap:wrap;gap:6px}
       h1{font-size:1.2rem}
+      .fullscreen-btn{font-size:14px;padding:6px 10px}
     }
     @media(min-width:900px){.board{grid-template-columns:repeat(6,1fr)}}
   </style>
@@ -52,6 +57,7 @@
         </select>
         <button id="shuffle">Mélanger</button>
         <button id="speakAll">Prononcer tous</button>
+        <button id="fullscreenBtn" class="fullscreen-btn">⛶ Plein écran</button>
       </div>
     </header>
 
@@ -235,6 +241,33 @@
       }
       lastTouchEnd = now;
     }, false);
+
+    // Gestion du mode plein écran
+    let isFullscreen = false;
+    const app = document.querySelector('.app');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    function toggleFullscreen() {
+      isFullscreen = !isFullscreen;
+      if (isFullscreen) {
+        app.classList.add('fullscreen');
+        fullscreenBtn.textContent = '⛶ Sortir';
+        document.body.style.overflow = 'hidden';
+      } else {
+        app.classList.remove('fullscreen');
+        fullscreenBtn.textContent = '⛶ Plein écran';
+        document.body.style.overflow = '';
+      }
+    }
+
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+    // Sortir du plein écran avec Escape
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && isFullscreen) {
+        toggleFullscreen();
+      }
+    });
 
     // initial
     pool = shuffle([...alphabet]);
