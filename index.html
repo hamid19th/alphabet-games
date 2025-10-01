@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Jeu — Apprendre l'alphabet</title>
+  <style>
+    :root{--bg:#f6f7fb;--card:#fff;--accent:#4f46e5;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, Arial, sans-serif;margin:0;background:var(--bg);color:#0f172a}
+    .app{max-width:900px;margin:36px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between}
+    h1{font-size:1.5rem;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    button,select{background:var(--card);border:1px solid #e6e8f0;padding:8px 12px;border-radius:8px;cursor:pointer}
+    .board{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:18px}
+    .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);padding:18px;text-align:center;cursor:pointer;user-select:none}
+    .letter{font-size:3.2rem;font-weight:700}
+    .word{color:var(--muted);margin-top:8px}
+    .big{display:flex;gap:18px;align-items:center;justify-content:center;margin-top:22px}
+    .big .letter{font-size:6rem}
+    .score{margin-top:14px;font-weight:600}
+    .hint{color:var(--muted);font-size:0.95rem}
+    .wrong{outline:3px solid #ef4444}
+    .right{outline:3px solid #10b981}
+    footer{margin-top:22px;color:var(--muted);font-size:0.9rem}
+    @media(min-width:900px){.board{grid-template-columns:repeat(6,1fr)}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Jeu — Apprendre l'alphabet (FR)</h1>
+      <div class="controls">
+        <label for="mode">Mode:</label>
+        <select id="mode">
+          <option value="flash">Flashcards</option>
+          <option value="quiz">Quiz — Choisis la bonne lettre</option>
+        </select>
+        <button id="shuffle">Mélanger</button>
+        <button id="speakAll">Prononcer tous</button>
+      </div>
+    </header>
+
+    <section class="big" id="mainBig">
+      <!-- Grande lettre ou instruction -->
+      <div>
+        <div class="letter" id="bigLetter">A</div>
+        <div class="word" id="bigWord">A comme "Arbre"</div>
+        <div class="hint">Clique sur une carte pour entendre la lettre. En mode Quiz: choisis la bonne lettre.</div>
+      </div>
+    </section>
+
+    <div class="score" id="score">Score: 0 / 0</div>
+
+    <div class="board" id="board"></div>
+
+    <footer>
+      Astuce: ce fichier est autonome — sauvegarde comme <strong>Jeu_Alphabet.html</strong> et ouvre-le dans un navigateur moderne.
+    </footer>
+  </div>
+
+  <script>
+    // Données: alphabet français + mot d'exemple
+    const alphabet = [
+      {l:'A', w:'Arbre'}, {l:'B', w:'Bateau'}, {l:'C', w:'Chat'}, {l:'D', w:'Dinde'},
+      {l:'E', w:'Étoile'}, {l:'F', w:'Fleur'}, {l:'G', w:'Guitare'}, {l:'H', w:'Hamster'},
+      {l:'I', w:'Île'}, {l:'J', w:'Jardin'}, {l:'K', w:'Koala'}, {l:'L', w:'Livre'},
+      {l:'M', w:'Maison'}, {l:'N', w:'Nuage'}, {l:'O', w:'Oiseau'}, {l:'P', w:'Papillon'},
+      {l:'Q', w:'Quatre'}, {l:'R', w:'Rivière'}, {l:'S', w:'Soleil'}, {l:'T', w:'Tortue'},
+      {l:'U', w:'Uniforme'}, {l:'V', w:'Voiture'}, {l:'W', w:'Wagon'}, {l:'X', w:'Xylophone'},
+      {l:'Y', w:'Yacht'}, {l:'Z', w:'Zèbre'}
+    ];
+
+    // état
+    let pool = [...alphabet];
+    let mode = 'flash';
+    let score = 0, attempts = 0;
+    const board = document.getElementById('board');
+    const bigLetter = document.getElementById('bigLetter');
+    const bigWord = document.getElementById('bigWord');
+    const scoreEl = document.getElementById('score');
+    const modeSelect = document.getElementById('mode');
+
+    // utilitaires
+    function shuffle(a){
+      for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+      return a;
+    }
+
+    function speak(text){
+      if(!('speechSynthesis' in window)) return;
+      const msg = new SpeechSynthesisUtterance(text);
+      // français
+      msg.lang = 'fr-FR';
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(msg);
+    }
+
+    function renderBoard(){
+      board.innerHTML='';
+      const items = [...pool];
+
+      // in quiz mode, show one target big and N options
+      if(mode === 'quiz'){
+        const target = items[Math.floor(Math.random()*items.length)];
+        bigLetter.textContent = target.l;
+        bigWord.textContent = 'Quelle carte montre la lettre « ' + target.l + ' » ?';
+        // prepare options: include target + 5 autres
+        const options = [target, ...shuffle(items.filter(i=>i.l!==target.l)).slice(0,5)];
+        shuffle(options).forEach(opt=>{
+          const c = makeCard(opt);
+          c.addEventListener('click',()=>handleQuizClick(opt, target, c));
+          board.appendChild(c);
+        });
+        attempts++;
+        updateScore();
+        return;
+      }
+
+      // flash mode: show all letters
+      bigLetter.textContent = pool[0].l;
+      bigWord.textContent = pool[0].l + ' comme "' + pool[0].w + '"';
+      items.forEach(it=>{
+        const c = makeCard(it);
+        c.addEventListener('click',()=>{ playCard(it, c); });
+        board.appendChild(c);
+      });
+    }
+
+    function makeCard(item){
+      const div = document.createElement('div');
+      div.className='card';
+      div.innerHTML = `<div class="letter">${item.l}</div><div class="word">${item.w}</div>`;
+      return div;
+    }
+
+    function playCard(item, cardEl){
+      // animate
+      cardEl.classList.add('right');
+      setTimeout(()=>cardEl.classList.remove('right'),700);
+      // pronounce letter + word
+      speak(item.l + ', ' + item.w);
+      // set big
+      bigLetter.textContent = item.l;
+      bigWord.textContent = item.l + ' comme "' + item.w + '"';
+    }
+
+    function handleQuizClick(chosen, target, cardEl){
+      if(chosen.l === target.l){
+        // correct
+        cardEl.classList.add('right');
+        score++;
+        speak('Bravo! ' + target.l + ', ' + target.w);
+      } else {
+        cardEl.classList.add('wrong');
+        speak('Non. C'est la lettre ' + target.l);
+      }
+      setTimeout(()=>{
+        cardEl.classList.remove('right','wrong');
+        renderBoard();
+      },900);
+      updateScore();
+    }
+
+    function updateScore(){
+      scoreEl.textContent = `Score: ${score} / ${attempts}`;
+    }
+
+    // contrôles
+    document.getElementById('shuffle').addEventListener('click',()=>{
+      pool = shuffle([...alphabet]);
+      score = 0; attempts = 0; updateScore(); renderBoard();
+    });
+
+    modeSelect.addEventListener('change',e=>{
+      mode = e.target.value;
+      score = 0; attempts = 0; updateScore(); renderBoard();
+    });
+
+    document.getElementById('speakAll').addEventListener('click',()=>{
+      // prononce toutes les lettres séquentiellement
+      let i=0;
+      function next(){
+        if(i>=pool.length) return;
+        const it = pool[i++];
+        speak(it.l + ', ' + it.w);
+        setTimeout(next,700);
+      }
+      next();
+    });
+
+    // initial
+    pool = shuffle([...alphabet]);
+    renderBoard();
+  </script>
+</body>
+</html>
